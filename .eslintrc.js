@@ -82,6 +82,7 @@ module.exports = {
   overrides: [
     {
       files: ['*.ts'],
+      excludedFiles: 'src/**/*.ts',
       rules: {
         'no-unused-vars': 0,
         'no-undef': 0,
@@ -129,5 +130,13 @@ module.exports = {
         '@typescript-eslint/no-restricted-imports': 'error',
       },
     },
-  ],
+    {
+      files: ['lib/**/*.ts'], // Alvo arquivos na pasta lib
+      rules: {
+        'no-unused-vars': 'off', // Desativa a regra para arquivos na pasta lib
+        'no-undef': 'off', // Desativa a regra para arquivos na pasta lib
+        'no-use-before-define': 'off', // Desativa a regra para arquivos na pasta lib
+      },
+    },
+  ]
 };

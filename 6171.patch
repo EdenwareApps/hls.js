@@ -1,0 +1,67 @@
+From e9bddd0aa3e7533b2e1f2dedc6478ed041560f6d Mon Sep 17 00:00:00 2001
+From: Rob Walch <rwalch@apple.com>
+Date: Fri, 2 Feb 2024 10:49:24 -0800
+Subject: [PATCH] [DRAFT] After failing to reload segments treat them as a
+ segment with a GAP tag #5153
+
+---
+ src/controller/base-stream-controller.ts | 23 +++++++++++++++--------
+ 1 file changed, 15 insertions(+), 8 deletions(-)
+
+diff --git a/src/controller/base-stream-controller.ts b/src/controller/base-stream-controller.ts
+index 3c699dc6a61..6aac7446465 100644
+--- a/src/controller/base-stream-controller.ts
++++ b/src/controller/base-stream-controller.ts
+@@ -1539,7 +1539,7 @@ export default class BaseStreamController
+     }
+     // keep retrying until the limit will be reached
+     const errorAction = data.errorAction;
+-    const { action, retryCount = 0, retryConfig } = errorAction || {};
++    const { action, retryCount = 0, retryConfig, flags } = errorAction || {};
+     if (
+       errorAction &&
+       action === NetworkErrorAction.RetryRequest &&
+@@ -1571,11 +1571,12 @@ export default class BaseStreamController
+         this.warn(
+           `${data.details} reached or exceeded max retry (${retryCount})`,
+         );
++        if (action === NetworkErrorAction.SendAlternateToPenaltyBox && flags) {
++          this.treatAsGap(frag);
++        }
+         return;
+       }
+-    } else if (
+-      errorAction?.action === NetworkErrorAction.SendAlternateToPenaltyBox
+-    ) {
++    } else if (action === NetworkErrorAction.SendAlternateToPenaltyBox) {
+       this.state = State.WAITING_LEVEL;
+     } else {
+       this.state = State.ERROR;
+@@ -1752,10 +1753,7 @@ export default class BaseStreamController
+       );
+       if (level.fragmentError === 0) {
+         // Mark and track the odd empty segment as a gap to avoid reloading
+-        level.fragmentError++;
+-        frag.gap = true;
+-        this.fragmentTracker.removeFragment(frag);
+-        this.fragmentTracker.fragBuffered(frag, true);
++        this.treatAsGap(frag, level);
+       }
+       this.warn(error.message);
+       this.hls.trigger(Events.ERROR, {
+@@ -1776,6 +1774,15 @@ export default class BaseStreamController
+     this.hls.trigger(Events.FRAG_PARSED, { frag, part });
+   }
+ 
++  private treatAsGap(frag: Fragment, level?: Level) {
++    if (level) {
++      level.fragmentError++;
++    }
++    frag.gap = true;
++    this.fragmentTracker.removeFragment(frag);
++    this.fragmentTracker.fragBuffered(frag, true);
++  }
++
+   protected resetTransmuxer() {
+     if (this.transmuxer) {
+       this.transmuxer.destroy();
